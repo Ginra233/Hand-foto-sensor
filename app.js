@@ -1,99 +1,131 @@
-import { GestureRecognizer, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
+import {
+    GestureRecognizer,
+    HandLandmarker,
+    FilesetResolver
+} from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js";
 
 const video = document.getElementById('webcam-video');
 const overlayCanvas = document.getElementById('overlay-canvas');
 const overlayCtx = overlayCanvas.getContext('2d');
 const statusDiv = document.getElementById('status');
-const photoCanvas = document.getElementById('photo-canvas');
+const capturedSection = document.getElementById('captured-section');
 const capturedImage = document.getElementById('captured-image');
 const downloadLink = document.getElementById('download-link');
 
 let gestureRecognizer;
-let runningMode = "VIDEO";
+let handLandmarker;
 let lastVideoTime = -1;
 let photoTaken = false;
+let isPalmOpen = false;
+let palmOpenStartTime = 0;
+const captureDelay = 3000; // 3 detik
 
-async function createGestureRecognizer() {
+async function initializeApp() {
     const vision = await FilesetResolver.forVisionTasks(
         "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
     );
+
     gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
         baseOptions: {
             modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task"
         },
-        runningMode: runningMode
+        runningMode: "VIDEO"
     });
-}
 
-createGestureRecognizer();
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+        baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task"
+        },
+        runningMode: "VIDEO"
+    });
 
-navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => {
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
         video.srcObject = stream;
-        video.addEventListener('loadeddata', () => {
+        video.onloadedmetadata = () => {
+            video.play();
             overlayCanvas.width = video.videoWidth;
             overlayCanvas.height = video.videoHeight;
             predictWebcam();
-        });
-    })
-    .catch(err => {
-        console.error("Error saat mengakses kamera: ", err);
-        statusDiv.innerText = "Error: Tidak bisa mengakses kamera.";
-    });
+        };
+    } catch (err) {
+        statusDiv.innerText = "Error: Tidak bisa mengakses kamera. Pastikan Anda memberikan izin.";
+        console.error("Error saat mengakses kamera:", err);
+    }
+}
 
-async function predictWebcam() {
+function predictWebcam() {
     if (photoTaken) return;
 
-    if (video.currentTime !== lastVideoTime) {
-        lastVideoTime = video.currentTime;
-        const results = gestureRecognizer.recognizeForVideo(video, performance.now());
-
-        overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-        
-        if (results.landmarks && results.landmarks.length > 0) {
-            for (const landmarks of results.landmarks) {
-                // Menggambar garis konektor antar landmark
-                drawConnectors(overlayCtx, landmarks, HAND_CONNECTIONS, { color: 'rgb(0,255,0)', lineWidth: 5 });
-                
-                // Menggambar titik-titik landmark
-                drawLandmarks(overlayCtx, landmarks, { color: 'rgb(255,0,0)', lineWidth: 2 });
-            }
-        }
-
-        if (results.gestures && results.gestures.length > 0) {
-            const topGesture = results.gestures[0][0].categoryName;
-            statusDiv.innerText = `Gerakan terdeteksi: ${topGesture}`;
-
-            if (topGesture === "Open_Palm") {
-                takePhoto();
-            }
-        } else {
-            statusDiv.innerText = "Tidak ada gestur terdeteksi.";
+    const now = performance.now();
+    if (now - lastVideoTime < 1000 / 30) { // Limit to ~30 FPS
+        requestAnimationFrame(predictWebcam);
+        return;
+    }
+    lastVideoTime = now;
+    
+    const gestureResults = gestureRecognizer.recognizeForVideo(video, now);
+    const landmarkResults = handLandmarker.detectForVideo(video, now);
+    
+    overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    
+    if (landmarkResults.landmarks && landmarkResults.landmarks.length > 0) {
+        for (const landmarks of landmarkResults.landmarks) {
+            drawConnectors(overlayCtx, landmarks, HAND_CONNECTIONS, { color: '#00ff00', lineWidth: 5 });
+            drawLandmarks(overlayCtx, landmarks, { color: '#ff0000', lineWidth: 2 });
         }
     }
+    
+    let isCurrentGesturePalmOpen = false;
+    if (gestureResults.gestures && gestureResults.gestures.length > 0) {
+        const topGesture = gestureResults.gestures[0][0].categoryName;
+        if (topGesture === "Open_Palm") {
+            isCurrentGesturePalmOpen = true;
+        }
+        statusDiv.innerText = `Gerakan terdeteksi: ${topGesture}`;
+    } else {
+        statusDiv.innerText = "Tidak ada gestur terdeteksi.";
+    }
 
+    if (isCurrentGesturePalmOpen) {
+        if (!isPalmOpen) {
+            isPalmOpen = true;
+            palmOpenStartTime = Date.now();
+        }
+        const timeLeft = Math.max(0, captureDelay - (Date.now() - palmOpenStartTime));
+        const secondsLeft = Math.ceil(timeLeft / 1000);
+        statusDiv.innerHTML = `Gerakan terdeteksi: **Open Palm**<br>Mengambil foto dalam ${secondsLeft}...`;
+        
+        if (timeLeft <= 0) {
+            takePhoto();
+            return;
+        }
+    } else {
+        isPalmOpen = false;
+        statusDiv.innerText = "Gerakan tangan 'Open Palm' untuk mengambil foto.";
+    }
+    
     requestAnimationFrame(predictWebcam);
 }
 
 function takePhoto() {
     photoTaken = true;
     statusDiv.innerText = "Foto diambil!";
-
+    
+    const photoCanvas = document.createElement('canvas');
     photoCanvas.width = video.videoWidth;
     photoCanvas.height = video.videoHeight;
-    
     photoCanvas.getContext('2d').drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
-
+    
     const imageDataURL = photoCanvas.toDataURL('image/png');
-
+    
     capturedImage.src = imageDataURL;
-    capturedImage.style.display = 'block';
+    capturedSection.style.display = 'flex';
     
     downloadLink.href = imageDataURL;
-    downloadLink.style.display = 'block';
-
-    video.style.display = 'none';
-    overlayCanvas.style.display = 'none';
+    
+    document.getElementById('camera-view').style.display = 'none';
+    statusDiv.style.display = 'none';
 }
 
 const HAND_CONNECTIONS = [
@@ -137,3 +169,5 @@ function drawLandmarks(ctx, keypoints, style) {
     }
     ctx.restore();
 }
+
+initializeApp();
