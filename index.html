@@ -2,23 +2,22 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Kamera Sensor Jarak Jauh</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kamera Aksi Tangan</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Kamera Sensor Jarak Jauh</h1>
-
-    <div id="video-container">
-        <video id="webcam-video" autoplay></video>
-        <canvas id="overlay-canvas"></canvas>
-    </div>
-    
-    <div id="status">Gerakkan tangan "Open Palm" untuk mengambil foto...</div>
-
-    <div id="captured-image-container">
-        <canvas id="photo-canvas" style="display:none;"></canvas>
-        <img id="captured-image" style="display:none;">
-        <a id="download-link" href="#" download="foto_sensor_tangan.png">Unduh Foto</a>
+    <div class="container">
+        <h1>Kamera Sensor Jarak Jauh</h1>
+        <div id="camera-view">
+            <video id="webcam-video" autoplay playsinline></video>
+            <canvas id="overlay-canvas"></canvas>
+        </div>
+        <div id="status">Gerakan tangan "Open Palm" untuk mengambil foto.</div>
+        <div id="captured-section" style="display: none;">
+            <img id="captured-image" alt="Foto yang diambil">
+            <a id="download-link" href="#" download="foto_sensor_tangan.png">Unduh Foto</a>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js" crossorigin="anonymous"></script>
