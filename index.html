@@ -2,64 +2,18 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Aplikasi Kamera dengan Sensor Tangan</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            background-color: #f0f0f0;
-            padding-top: 50px;
-        }
-        #video-container {
-            width: 640px;
-            height: 480px;
-            margin: auto;
-            border: 2px solid #333;
-            background-color: #000;
-            position: relative;
-        }
-        #webcam-video {
-            width: 100%;
-            height: 100%;
-        }
-        #overlay-canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            z-index: 10;
-        }
-        #status {
-            margin-top: 20px;
-            font-size: 1.2em;
-            color: #555;
-        }
-        #captured-image-container {
-            margin-top: 30px;
-        }
-        #captured-image {
-            border: 2px solid #555;
-            margin-top: 10px;
-            max-width: 100%;
-            height: auto;
-        }
-        #download-link {
-            display: none;
-            margin-top: 10px;
-            text-decoration: none;
-            color: #007BFF;
-            font-weight: bold;
-        }
-    </style>
+    <title>Kamera Sensor Jarak Jauh</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Ambil Foto dengan Sensor Tangan</h1>
+    <h1>Kamera Sensor Jarak Jauh</h1>
 
     <div id="video-container">
         <video id="webcam-video" autoplay></video>
         <canvas id="overlay-canvas"></canvas>
     </div>
     
-    <div id="status">Gerakkan tangan Anda untuk mengambil foto...</div>
+    <div id="status">Gerakkan tangan "Open Palm" untuk mengambil foto...</div>
 
     <div id="captured-image-container">
         <canvas id="photo-canvas" style="display:none;"></canvas>
@@ -68,107 +22,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/vision_bundle.js" crossorigin="anonymous"></script>
-    <script>
-        const video = document.getElementById('webcam-video');
-        const overlayCanvas = document.getElementById('overlay-canvas');
-        const overlayCtx = overlayCanvas.getContext('2d');
-        const statusDiv = document.getElementById('status');
-        const photoCanvas = document.getElementById('photo-canvas');
-        const capturedImage = document.getElementById('captured-image');
-        const downloadLink = document.getElementById('download-link');
-
-        let gestureRecognizer;
-        let runningMode = "VIDEO";
-        let lastVideoTime = -1;
-        let photoTaken = false;
-
-        async function createGestureRecognizer() {
-            const vision = await FilesetResolver.forVisionTasks(
-                "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm"
-            );
-            gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
-                baseOptions: {
-                    modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task"
-                },
-                runningMode: runningMode
-            });
-        }
-
-        createGestureRecognizer();
-
-        // Minta izin kamera
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => {
-                video.srcObject = stream;
-                video.addEventListener('loadeddata', () => {
-                    overlayCanvas.width = video.videoWidth;
-                    overlayCanvas.height = video.videoHeight;
-                    predictWebcam();
-                });
-            })
-            .catch(err => {
-                console.error("Error saat mengakses kamera: ", err);
-                statusDiv.innerText = "Error: Tidak bisa mengakses kamera.";
-            });
-
-        async function predictWebcam() {
-            if (photoTaken) return;
-
-            if (video.currentTime !== lastVideoTime) {
-                lastVideoTime = video.currentTime;
-                const results = gestureRecognizer.recognizeForVideo(video, performance.now());
-
-                overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                
-                // Tambahkan logika untuk menggambar landmark
-                // Anda bisa mengimpor dan menggunakan fungsi drawConnectors dan drawLandmarks dari kode sebelumnya
-                // Jika Anda ingin menampilkan visualisasi tulang tangan
-                if (results.landmarks && results.landmarks.length > 0) {
-                     // Logika visualisasi di sini (opsional)
-                }
-
-                if (results.gestures && results.gestures.length > 0) {
-                    const topGesture = results.gestures[0][0].categoryName;
-                    statusDiv.innerText = `Gerakan terdeteksi: ${topGesture}`;
-
-                    // Logika untuk mengambil foto berdasarkan gestur
-                    if (topGesture === "Open_Palm") {
-                        takePhoto();
-                    }
-                } else {
-                    statusDiv.innerText = "Tidak ada gestur terdeteksi.";
-                }
-            }
-
-            requestAnimationFrame(predictWebcam);
-        }
-
-        function takePhoto() {
-            photoTaken = true;
-            statusDiv.innerText = "Foto diambil!";
-
-            // Atur ukuran canvas sesuai dengan video
-            photoCanvas.width = video.videoWidth;
-            photoCanvas.height = video.videoHeight;
-            
-            // Ambil gambar dari video dan gambarkan di canvas
-            photoCanvas.getContext('2d').drawImage(video, 0, 0, photoCanvas.width, photoCanvas.height);
-
-            // Konversi gambar di canvas ke format data URL
-            const imageDataURL = photoCanvas.toDataURL('image/png');
-
-            // Tampilkan gambar yang sudah diambil
-            capturedImage.src = imageDataURL;
-            capturedImage.style.display = 'block';
-            
-            // Atur link unduh
-            downloadLink.href = imageDataURL;
-            downloadLink.style.display = 'block';
-
-            // Hentikan video dan sembunyikan overlay
-            video.style.display = 'none';
-            overlayCanvas.style.display = 'none';
-        }
-    </script>
+    <script type="module" src="app.js"></script>
 </body>
 </html>
